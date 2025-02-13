@@ -1,0 +1,51 @@
+# Load necessary libraries
+library(dplyr)
+library(caTools)
+library(caret)
+library(ggplot2)
+
+# Load the dataset (Replace with your dataset)
+data <- data.frame(
+  age = c(25, 34, 45, 23, 35, 55, 28, 32, 60, 29),
+  subscription_plan = c("Basic", "Premium", "Premium", "Basic", "Premium", "Basic", "Basic", "Premium", "Basic", "Premium"),
+  total_spend = c(100, 300, 250, 120, 350, 90, 110, 380, 80, 400),
+  tenure = c(2, 5, 3, 1, 6, 2, 4, 7, 1, 8),
+  churn = c(0, 0, 1, 0, 0, 1, 0, 0, 1, 0)  # 0 = Stayed, 1 = Churned
+)
+
+# Convert categorical variables into factors
+data$subscription_plan <- factor(data$subscription_plan, levels = c("Basic", "Premium"))
+
+# Split the data into training and testing sets (70% train, 30% test)
+set.seed(42)  # Set a seed for reproducibility
+split <- sample.split(data$churn, SplitRatio = 0.7)
+train_data <- subset(data, split == TRUE)
+test_data <- subset(data, split == FALSE)
+
+# Normalize numerical columns: age, total_spend, and tenure
+num_cols <- c('age', 'total_spend', 'tenure')
+
+# Scaling numeric columns using caret's preProcess function
+pre_process <- preProcess(train_data[, num_cols], method = c("center", "scale"))
+train_data[, num_cols] <- predict(pre_process, train_data[, num_cols])
+test_data[, num_cols] <- predict(pre_process, test_data[, num_cols])
+
+# Train the Logistic Regression model
+model <- glm(churn ~ age + subscription_plan + total_spend + tenure, 
+             data = train_data, 
+             family = binomial(link = "logit"))
+
+# Summary of the model
+summary(model)
+
+# Make predictions on the test set
+predictions <- predict(model, newdata = test_data, type = "response")
+predicted_class <- ifelse(predictions > 0.5, 1, 0)
+
+# Evaluate the model using Confusion Matrix
+conf_matrix <- confusionMatrix(factor(predicted_class), factor(test_data$churn))
+print(conf_matrix)
+
+# Plot ROC curve
+roc_curve <- roc(test_data$churn, predictions)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
